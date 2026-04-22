@@ -42,6 +42,11 @@
   * `service_discovery/service`：基于 Nacos 的应用级服务发现（Dubbo3 模型）Java/Go 互操作示例。
 * `llm`：将大模型（LLM）集成到 Dubbo-go 中的示例。
 * `logger`：Dubbo-go 应用的日志使用示例。
+  * `logger/default`：默认打印到控制台。
+  * `logger/level`：设置日志隔离级别。
+  * `logger/rolling`：输出到文件。
+  * `logger/custom`：自定义 logger。
+  * `logger/trace-integration`：集成 OpenTelemetry trace 信息，自动将 trace_id、span_id 等信息注入日志。
 * `metrics`：可观测性相关示例。
   * `metrics/prometheus_grafana`：展示如何采集并暴露 Dubbo-go 服务指标，支持 Prometheus Push 和 Pull 两种模式；同时包含用于清理 Push 模式僵尸指标的 `pgw-cleaner` 工具。
   * `metrics/probe`：演示 Dubbo-go 在 Kubernetes 场景下的探针端点（`/live`、`/ready`、`/startup`）及部署方式。

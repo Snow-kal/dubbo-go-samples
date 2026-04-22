@@ -42,6 +42,11 @@ Please refer to [HOWTO.md](HOWTO.md) for detailed instructions on running the sa
   * `service_discovery/service`: Java/Go interoperability with Nacos using application-level service discovery (Dubbo3 model).
 * `llm`: Example of integrating Large Language Models (LLMs) with Dubbo-go.
 * `logger`: Logging examples for Dubbo-go applications.
+  * `logger/default`: Print to console by default.
+  * `logger/level`: Set log isolation level.
+  * `logger/rolling`: Output to file.
+  * `logger/custom`: Custom logger.
+  * `logger/trace-integration`: Integrate OpenTelemetry trace information, automatically injecting trace_id, span_id and other information into logs.
 * `metrics`: Observability-related samples.
   * `metrics/prometheus_grafana`: Shows how to collect and expose metrics from Dubbo-go services, supporting both Prometheus Push and Pull modes. Also includes the `pgw-cleaner` tool for cleaning zombie metrics in Push mode.
   * `metrics/probe`: Demonstrates Dubbo-go Kubernetes probe endpoints (`/live`, `/ready`, `/startup`) and deployment usage.
