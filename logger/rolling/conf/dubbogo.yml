@@ -4,6 +4,7 @@ dubbo:
       name: tri
       port: 20000
   logger:
+    appender: file
     file:
       name: logs.log
       max-size: 1
