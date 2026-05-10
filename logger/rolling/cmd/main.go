@@ -44,6 +44,7 @@ func main() {
 			logger.Info("hello dubbogo this is info log")
 			logger.Debug("hello dubbogo this is debug log")
 			logger.Warn("hello dubbogo this is warn log")
+			time.Sleep(time.Second * 1)
 		}
 	}
 }
