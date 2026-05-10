@@ -40,10 +40,11 @@ logger.SetLoggerLevel("warn")
 
 #### output to file
 
-Add the file item under the logger option in the configuration file
+Set `appender: file` and add the file item under the logger option in the configuration file. When the sample is run from `logger/rolling`, the relative file name below is created as `logger/rolling/logs.log`. Use `appender: console,file` if you want the same log records to be written to both console and file.
 
 ```yaml
   logger:
+    appender: file
     file:
       name: logs.log
       max-size: 1

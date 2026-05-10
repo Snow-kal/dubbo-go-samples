@@ -40,10 +40,11 @@ logger.SetLoggerLevel("warn")
 
 #### 输出到文件
 
-在配置文件中的 logger 选项下添加 file 项
+在配置文件中的 logger 选项下设置 `appender: file` 并添加 file 项。从 `logger/rolling` 目录运行样例时，下面的相对文件名会生成到 `logger/rolling/logs.log`。如果希望同一批日志同时输出到控制台和文件，可使用 `appender: console,file`。
 
 ```yaml
   logger:
+    appender: file
     file:
       name: logs.log
       max-size: 1
