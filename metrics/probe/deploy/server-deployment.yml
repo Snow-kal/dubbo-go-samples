@@ -14,18 +14,10 @@ spec:
       labels:
         app: dubbo-go-probe-server
     spec:
-      terminationGracePeriodSeconds: 15
       containers:
         - name: server
           image: dubbo-go-probe-server:latest
           imagePullPolicy: IfNotPresent
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
           ports:
             - containerPort: 20000
               name: triple
