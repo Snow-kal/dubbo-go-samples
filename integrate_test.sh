@@ -635,9 +635,10 @@ start_java_server_if_present() {
 }
 
 run_graceful_shutdown_sample() {
-  local client_log="/tmp/.${PROJECT_NAME}.go-client.log"
+  local inflight_client_log="/tmp/.${PROJECT_NAME}.go-client.inflight.log"
+  local reject_client_log="/tmp/.${PROJECT_NAME}.go-client.reject.log"
+  local inflight_client_pid=""
   local server_pid=""
-  local client_pid=""
   local server_bin="/tmp/.${PROJECT_NAME}.go-server.bin"
   local client_bin="/tmp/.${PROJECT_NAME}.go-client.bin"
 
@@ -660,7 +661,13 @@ run_graceful_shutdown_sample() {
   echo "Starting graceful_shutdown Go server..."
   (
     cd "$P_DIR"
-    exec "$server_bin" -timeout=15s -step-timeout=2s -consumer-update-wait=0s -delay=2s
+    exec "$server_bin" \
+      -timeout=25s \
+      -step-timeout=20s \
+      -consumer-update-wait=0s \
+      -offline-window=0s \
+      -delay=3s \
+      -ignore-context-cancel=true
   ) >"$GO_SERVER_LOG" 2>&1 &
   server_pid="$!"
   echo "$server_pid" >"$PID_FILE"
@@ -677,35 +684,42 @@ run_graceful_shutdown_sample() {
     return 1
   fi
 
-  echo "Running graceful_shutdown Go client..."
+  echo "Running graceful_shutdown in-flight request validation..."
   (
     cd "$P_DIR"
     exec "$client_bin" \
       -addr=tri://127.0.0.1:20000 \
-      -concurrency=2 \
-      -interval=200ms \
-      -short \
-      -request-timeout=6s \
-      -max-requests=12 \
+      -short=true \
+      -max-requests=1 \
       -min-successes=1 \
-      -min-failures=1 \
-      -name-prefix=integration
-  ) >"$client_log" 2>&1 &
-  client_pid="$!"
+      -request-timeout=10s \
+      -name-prefix=integration-inflight
+  ) >"$inflight_client_log" 2>&1 &
+  inflight_client_pid="$!"
 
-  if ! wait_for_log_pattern "$client_log" "succeeded" 30; then
-    echo "graceful_shutdown client did not observe a successful request before shutdown"
-    cat "$client_log" || true
+  if ! wait_for_log_pattern "$GO_SERVER_LOG" "Handling greet request, name=integration-inflight-1" 30; then
+    echo "graceful_shutdown in-flight request did not enter the provider"
+    kill_if_running "$inflight_client_pid"
+    wait "$inflight_client_pid" 2>/dev/null || true
+    cat "$inflight_client_log" || true
     cat "$GO_SERVER_LOG" || true
     return 1
   fi
 
-  echo "Triggering graceful shutdown..."
+  echo "Triggering graceful_shutdown after in-flight request entered provider..."
   kill -INT "$server_pid" 2>/dev/null || true
 
-  if ! wait "$client_pid"; then
-    echo "graceful_shutdown client exited with failure"
-    cat "$client_log" || true
+  if ! wait "$inflight_client_pid"; then
+    echo "graceful_shutdown in-flight request validation failed"
+    cat "$inflight_client_log" || true
+    cat "$GO_SERVER_LOG" || true
+    return 1
+  fi
+  inflight_client_pid=""
+
+  if ! wait_for_log_pattern "$GO_SERVER_LOG" "Greet request finished, name=integration-inflight-1" 30; then
+    echo "graceful_shutdown in-flight request did not finish in the provider"
+    cat "$inflight_client_log" || true
     cat "$GO_SERVER_LOG" || true
     return 1
   fi
@@ -717,12 +731,64 @@ run_graceful_shutdown_sample() {
   fi
 
   wait "$server_pid" 2>/dev/null || true
+  server_pid=""
+  rm -f "$PID_FILE"
 
-  if ! grep -q "failed" "$client_log"; then
-    echo "graceful_shutdown client did not observe request failures during shutdown"
-    cat "$client_log" || true
+  echo "Starting graceful_shutdown reject-stage validation server..."
+  : >"$GO_SERVER_LOG"
+  (
+    cd "$P_DIR"
+    exec "$server_bin" \
+      -timeout=25s \
+      -step-timeout=20s \
+      -consumer-update-wait=0s \
+      -offline-window=0s \
+      -reject-request=true
+  ) >"$GO_SERVER_LOG" 2>&1 &
+  server_pid="$!"
+  echo "$server_pid" >"$PID_FILE"
+
+  if ! wait_for_tcp_port "127.0.0.1" "20000" 30; then
+    echo "graceful_shutdown reject-stage server did not become ready on 127.0.0.1:20000"
+    cat "$GO_SERVER_LOG" || true
     return 1
   fi
+
+  echo "Running graceful_shutdown reject-stage probe..."
+  (
+    cd "$P_DIR"
+    exec "$client_bin" \
+      -addr=tri://127.0.0.1:20000 \
+      -short=true \
+      -max-requests=1 \
+      -min-failures=1 \
+      -request-timeout=5s \
+      -name-prefix=integration-reject-probe
+  ) >"$reject_client_log" 2>&1 || {
+    echo "graceful_shutdown reject-stage probe failed"
+    cat "$reject_client_log" || true
+    cat "$GO_SERVER_LOG" || true
+    return 1
+  }
+
+  if grep -q "Handling greet request, name=integration-reject-probe" "$GO_SERVER_LOG"; then
+    echo "graceful_shutdown reject-stage probe reached the Greet handler"
+    cat "$reject_client_log" || true
+    cat "$GO_SERVER_LOG" || true
+    return 1
+  fi
+
+  if ! wait_for_log_pattern "$GO_SERVER_LOG" "application is closing, new request will be rejected" 30; then
+    echo "graceful_shutdown reject-stage probe was not rejected by the framework provider filter"
+    cat "$reject_client_log" || true
+    cat "$GO_SERVER_LOG" || true
+    return 1
+  fi
+
+  kill_if_running "$server_pid"
+  wait "$server_pid" 2>/dev/null || true
+  server_pid=""
+  rm -f "$PID_FILE"
 
   echo "graceful_shutdown integration completed"
 }

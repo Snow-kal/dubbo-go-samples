@@ -9,7 +9,7 @@
 - 长连接消费者的主动通知
 - 消费端在停机期间的被动关闭表现
 - Provider 停机时对进行中请求的等待与排空
-- `timeout`、`step-timeout`、`consumer-update-wait` 和 `offline-window` 等参数的影响
+- `timeout`、`step-timeout`、`notify-timeout`、`consumer-update-wait` 和 `offline-window` 等参数的影响
 
 该示例**不包含注册中心**。因此你可以验证协议层的主动通知和请求排空行为，但不能直接观察“从注册中心摘除并传播”的完整链路。
 
@@ -62,11 +62,16 @@ go run ./graceful_shutdown/go-client/cmd -addr=tri://127.0.0.1:20000 -concurrenc
 - `-port=20000`
 - `-timeout=60s`
 - `-step-timeout=3s`
+- `-notify-timeout=5s`
 - `-consumer-update-wait=3s`
 - `-offline-window=3s`
 - `-delay=0s`
+- `-ignore-context-cancel=false`
+- `-reject-request=false`
 
 其中 `-delay` 会给每次请求增加固定处理延迟，用于观察停机时的在途请求排空效果。
+`-ignore-context-cancel` 用于自动化集成测试场景，使在途请求在停机开始后仍继续执行。
+`-reject-request` 用于自动化集成测试场景，在不依赖自然停机短暂窗口的情况下进入框架拒绝路径。
 
 ## 客户端参数
 
@@ -197,14 +202,16 @@ go run ./graceful_shutdown/go-client/cmd -addr=tri://127.0.0.1:20000 -short=true
 ./integrate_test.sh graceful_shutdown
 ```
 
-脚本会启动 Triple 服务端，后台运行客户端，在观察到至少一次成功请求后向服务端发送中断信号，并要求客户端在退出前同时观察到：
+脚本会分两段验证行为。第一段使用内置集成测试参数启动 Triple 服务端，先启动一个在途 Go client 请求，等待该请求进入 Provider 后由脚本发送中断信号触发优雅停机；第二段会重新启动一个启用框架请求拒绝的服务端，再启动一个独立的短连接探针，验证新请求会被框架拒绝。
 
-- 至少一次成功请求
-- 至少一次停机期间的失败请求
+- 停机开始后，第一个进行中的请求仍能成功完成
+- 独立探针请求会被框架 provider filter 拒绝，且不会进入 `Greet` handler
+- 服务端会在配置的停机超时时间内退出
 
-如果这些条件没有满足，客户端会直接 `panic`，从而使 CI 失败。
+如果预期的成功和失败次数不满足，或拒绝探针进入了 `Greet` handler，CI 会立即失败。
 
 ## 补充说明
 
 - 该示例以 Triple 协议为主，用于聚焦当前优雅停机流程中的主动通知路径。
+- 服务端通过 `dubbo.WithShutdown(...)` 配置优雅停机，这是当前 API 使用的实例级公开配置方式。
 - 因为没有注册中心，这里只能覆盖协议层停机行为，不能完整覆盖注册中心摘除传播。

@@ -8,7 +8,7 @@ It is useful for verifying these behaviors:
 - active notice for long connections on Triple
 - passive closing behavior on the consumer side
 - waiting for in-flight provider requests during shutdown
-- the effect of `timeout`, `step-timeout`, `consumer-update-wait`, and `offline-window`
+- the effect of `timeout`, `step-timeout`, `notify-timeout`, `consumer-update-wait`, and `offline-window`
 
 This sample does **not** include a registry. That means you can test protocol-level active notice and request draining, but you cannot directly observe registry unregister propagation in this sample alone.
 
@@ -58,11 +58,16 @@ If you omit the protocol prefix and only pass `127.0.0.1:20000`, the direct refe
 - `-port=20000`
 - `-timeout=60s`
 - `-step-timeout=3s`
+- `-notify-timeout=5s`
 - `-consumer-update-wait=3s`
 - `-offline-window=3s`
 - `-delay=0s`
+- `-ignore-context-cancel=false`
+- `-reject-request=false`
 
 `-delay` adds artificial processing delay to every request so you can verify in-flight request draining.
+`-ignore-context-cancel` is used by the automated integration scenario to keep the in-flight request running after shutdown begins.
+`-reject-request` is used by the automated integration scenario to start the framework reject path without relying on the short natural shutdown window.
 
 ## Client Flags
 
@@ -179,17 +184,19 @@ This sample is wired into the root integration test flow:
 ./integrate_test.sh graceful_shutdown
 ```
 
-The script starts the Triple server, runs the client in the background, waits until at least one request succeeds, and then sends an interrupt signal to trigger graceful shutdown.
+The script validates two behaviors separately. First, it starts the Triple server with the built-in integration flags, starts an in-flight Go client request, waits until that request enters the provider, and then sends an interrupt signal to trigger graceful shutdown. Second, it starts a fresh server with framework request rejection enabled and runs a separate short-connection probe to verify new requests are rejected by the framework.
 
-Before the client exits, it must observe:
+The integration asserts that:
 
-- at least one successful request
-- at least one failed request during shutdown
+- the in-flight first request completes successfully after shutdown starts
+- a separate request is rejected by the framework provider filter without entering the `Greet` handler
+- the server exits within the configured shutdown timeout
 
-If those expectations are not met, the client panics so CI fails immediately.
+If the expected success and failure counts are not met, or if the reject probe reaches the `Greet` handler, CI fails immediately.
 
 ## Practical Notes
 
 - Triple is the intended protocol for manual verification in this sample.
 - This sample is intentionally Triple-only so it focuses on the active notice path implemented in the current graceful shutdown flow.
+- The server configures graceful shutdown through `dubbo.WithShutdown(...)`, which is the public instance-level configuration path used by the current API.
 - Because this sample has no registry, the "unregister from registry" phase is only part of the core implementation flow, not something you can fully observe here.
