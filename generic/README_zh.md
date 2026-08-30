@@ -33,6 +33,21 @@ go run .
 
 客户端在 `cli.NewGenericService(...)` 处通过 `client.WithURL("tri://127.0.0.1:50052")` 为该服务单独配置直连地址，并基于该泛化服务发起调用。
 
+## 泛化模式测试
+
+Go 客户端使用 `client.WithGenericType(...)` 选择泛化格式。该配置与 `client.WithSerialization(...)` 相互独立，后者用于选择请求在网络上传输时采用的序列化编码。
+
+| 泛化模式 | 含义 | 示例覆盖范围 |
+|----------|------|--------------|
+| `true` | 基于 Map 的泛化结果（默认模式） | 远程类型化结果及 Go-Java 互操作测试 |
+| `gson` | JSON 格式的泛化结果 | 远程类型化结果及 Go-Java 互操作测试 |
+| `bean` | JavaBean 描述符格式的泛化结果 | 远程类型化结果及 Go-Java 互操作测试 |
+| `protobuf-json` | Protobuf JSON 格式的泛化结果 | 当前 Hessian POJO 服务不使用该模式 |
+| `protobuf` | 为兼容旧版本保留的别名 | 保留兼容能力 |
+| `false` 或空值 | 关闭泛化调用 | 不发起泛化调用 |
+
+现有 Go 客户端会验证 `true`、`gson` 和 `bean` 的类型化结果，并确认未知模式会被拒绝。当前 `User` 服务是 Hessian POJO，并非 `proto.Message`，因此本集成流程不包含 `protobuf-json` 调用。
+
 ## 启动 Java 服务端
 
 在 java-server 目录下构建并运行：
@@ -89,3 +104,4 @@ All generic call tests completed
 - Go 服务端和 Java 服务端均无需 ZooKeeper，直接监听各自配置的端口。
 - Java 客户端通过 `reference.setUrl(...)` 直连 `tri://127.0.0.1:50052`。
 - Go 客户端通过 `tri://127.0.0.1:50052` 直连。
+- 未知泛化模式会在创建服务时明确失败，不会静默回退到 Map 模式。

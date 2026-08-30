@@ -33,6 +33,21 @@ go run .
 
 The client passes `client.WithURL("tri://127.0.0.1:50052")` to `cli.NewGenericService(...)` for a per-service direct connection and performs generic calls through that generic service.
 
+## Generic mode tests
+
+The Go client uses `client.WithGenericType(...)` to select the generic format. This is independent from `client.WithSerialization(...)`, which selects the transport encoding on the wire.
+
+| Generic mode | Meaning | Sample coverage |
+|--------------|---------|-----------------|
+| `true` | Map-based generic result (default) | Remote typed result and Go-Java integration |
+| `gson` | JSON generic result | Remote typed result and Go-Java integration |
+| `bean` | JavaBean descriptor result | Remote typed result and Go-Java integration |
+| `protobuf-json` | Protobuf JSON result | Not used by the current Hessian POJO service |
+| `protobuf` | Legacy compatibility alias | Preserved for compatibility |
+| `false` or empty | Disable generic invocation | No generic call is made |
+
+The existing Go client validates typed results for `true`, `gson`, and `bean`, and checks that an unknown mode is rejected. The current `User` service is a Hessian POJO rather than a `proto.Message`, so `protobuf-json` is not included in this integration flow.
+
 ## Run the Java Server
 
 Build and run from the java-server directory:
@@ -89,3 +104,4 @@ All generic call tests completed
 - Neither the Go server nor the Java server requires ZooKeeper; both listen directly on their configured ports.
 - The Java client uses direct connection via `tri://127.0.0.1:50052` (`reference.setUrl(...)`).
 - The Go client uses direct connection via `tri://127.0.0.1:50052`.
+- Unknown generic modes fail during service creation instead of silently falling back to Map.
