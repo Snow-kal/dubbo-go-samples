@@ -19,12 +19,15 @@ package pkg
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
 )
 
 import (
+	"dubbo.apache.org/dubbo-go/v3/common/constant"
+
 	"github.com/dubbogo/gost/log/logger"
 )
 
@@ -133,7 +136,20 @@ func (u *UserProvider) Invoke(ctx context.Context, methodName string, types []st
 	case "GetUser4":
 		return u.GetUser4(ctx, args[0].(int32), args[1].(string))
 	case "GetOneUser":
-		return u.GetOneUser(ctx)
+		result, err := u.GetOneUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+		attachments, _ := ctx.Value(constant.AttachmentKey).(map[string]interface{})
+		modes, _ := attachments[constant.GenericKey].([]string)
+		if len(modes) > 0 && modes[0] == constant.GenericSerializationGson {
+			encoded, marshalErr := json.Marshal(result)
+			if marshalErr != nil {
+				return nil, fmt.Errorf("marshal gson generic result: %w", marshalErr)
+			}
+			return string(encoded), nil
+		}
+		return result, nil
 	case "GetUsers":
 		return u.GetUsers(ctx, args[0].([]string))
 	case "GetUsersMap":
