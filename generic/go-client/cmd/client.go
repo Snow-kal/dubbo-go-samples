@@ -76,22 +76,22 @@ func main() {
 	}
 
 	logger.Infof("Direct URL: %s", DirectServerURL)
-	logger.Info("Connected to server via direct URL, starting tests...")
+	logger.Info("Connected to server via direct URL, starting checks...")
 
 	failed := false
-	failed = runGenericTests(genericService.Invoke) || failed
-	failed = runTypedResultTests(cli) || failed
+	failed = runGenericChecks(genericService.Invoke) || failed
+	failed = runGenericModeChecks(cli) || failed
 
 	if failed {
-		logger.Errorf("Some generic call tests failed")
+		logger.Errorf("Some generic call checks failed")
 		os.Exit(1)
 	}
-	logger.Info("All generic call tests passed")
+	logger.Info("All generic call checks passed")
 }
 
 type genericInvokeFunc func(context.Context, string, []string, []hessian.Object) (any, error)
 
-func runGenericTests(invoke genericInvokeFunc) bool {
+func runGenericChecks(invoke genericInvokeFunc) bool {
 	failed := false
 	ctx := context.Background()
 
@@ -198,7 +198,7 @@ func runGenericTests(invoke genericInvokeFunc) bool {
 	return failed
 }
 
-func runTypedResultTests(cli *client.Client) bool {
+func runGenericModeChecks(cli *client.Client) bool {
 	failed := false
 	ctx := context.Background()
 
@@ -222,6 +222,7 @@ func runTypedResultTests(cli *client.Client) bool {
 		method     string
 		types      []string
 		args       []hessian.Object
+		typed      bool
 		expectedID string
 	}{
 		{
@@ -230,15 +231,15 @@ func runTypedResultTests(cli *client.Client) bool {
 			method:     "GetUser1",
 			types:      []string{"java.lang.String"},
 			args:       []hessian.Object{"A003"},
+			typed:      true,
 			expectedID: "A003",
 		},
 		{
-			name:       "gson",
-			mode:       constant.GenericSerializationGson,
-			method:     "GetOneUser",
-			types:      []string{},
-			args:       []hessian.Object{},
-			expectedID: "1000",
+			name:   "gson",
+			mode:   constant.GenericSerializationGson,
+			method: "GetOneUser",
+			types:  []string{},
+			args:   []hessian.Object{},
 		},
 		{
 			name:       "bean",
@@ -246,6 +247,7 @@ func runTypedResultTests(cli *client.Client) bool {
 			method:     "GetOneUser",
 			types:      []string{},
 			args:       []hessian.Object{},
+			typed:      true,
 			expectedID: "1000",
 		},
 	}
@@ -264,6 +266,22 @@ func runTypedResultTests(cli *client.Client) bool {
 			failed = true
 			continue
 		}
+		if !testCase.typed {
+			result, err := service.Invoke(ctx, testCase.method, testCase.types, testCase.args)
+			if err != nil {
+				logger.Errorf("%s generic result (%s) failed: %v", testCase.method, testCase.name, err)
+				failed = true
+				continue
+			}
+			if result == nil {
+				logger.Errorf("%s generic result (%s) returned nil", testCase.method, testCase.name)
+				failed = true
+				continue
+			}
+			logger.Infof("%s generic result (%s) type=%T res: %+v", testCase.method, testCase.name, result, result)
+			continue
+		}
+
 		var user pkg.User
 		err = service.InvokeWithType(
 			ctx,

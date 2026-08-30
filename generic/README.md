@@ -33,20 +33,20 @@ go run .
 
 The client passes `client.WithURL("tri://127.0.0.1:50052")` to `cli.NewGenericService(...)` for a per-service direct connection and performs generic calls through that generic service.
 
-## Generic mode tests
+## Generic mode runtime checks
 
 The Go client uses `client.WithGenericType(...)` to select the generic format. This is independent from `client.WithSerialization(...)`, which selects the transport encoding on the wire.
 
-| Generic mode | Meaning | Sample coverage |
-|--------------|---------|-----------------|
-| `true` | Map-based generic result (default) | Remote typed result and Go-Java integration |
-| `gson` | JSON generic result | Remote typed result and Go-Java integration |
-| `bean` | JavaBean descriptor result | Remote typed result and Go-Java integration |
+| Generic mode | Meaning | Runtime sample coverage |
+|--------------|---------|-------------------------|
+| `true` | Map-based generic result (default) | Remote typed-result check |
+| `gson` | JSON generic result | Remote raw-result check |
+| `bean` | JavaBean descriptor result | Remote typed-result check |
 | `protobuf-json` | Protobuf JSON result | Not used by the current Hessian POJO service |
 | `protobuf` | Legacy compatibility alias | Preserved for compatibility |
 | `false` or empty | Disable generic invocation | No generic call is made |
 
-The existing Go client validates typed results for `true`, `gson`, and `bean`, and checks that an unknown mode is rejected. The current `User` service is a Hessian POJO rather than a `proto.Message`, so `protobuf-json` is not included in this integration flow.
+When the existing Go client runs, it checks typed results for `true` and `bean`, keeps the raw result for `gson`, and confirms that an unknown mode is rejected. These are runtime sample checks rather than `go test` unit tests. The current `User` service is a Hessian POJO rather than a `proto.Message`, so `protobuf-json` is not included in this flow.
 
 ## Run the Java Server
 

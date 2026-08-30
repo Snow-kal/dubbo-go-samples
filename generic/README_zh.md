@@ -33,20 +33,20 @@ go run .
 
 客户端在 `cli.NewGenericService(...)` 处通过 `client.WithURL("tri://127.0.0.1:50052")` 为该服务单独配置直连地址，并基于该泛化服务发起调用。
 
-## 泛化模式测试
+## 泛化模式运行时检查
 
 Go 客户端使用 `client.WithGenericType(...)` 选择泛化格式。该配置与 `client.WithSerialization(...)` 相互独立，后者用于选择请求在网络上传输时采用的序列化编码。
 
-| 泛化模式 | 含义 | 示例覆盖范围 |
-|----------|------|--------------|
-| `true` | 基于 Map 的泛化结果（默认模式） | 远程类型化结果及 Go-Java 互操作测试 |
-| `gson` | JSON 格式的泛化结果 | 远程类型化结果及 Go-Java 互操作测试 |
-| `bean` | JavaBean 描述符格式的泛化结果 | 远程类型化结果及 Go-Java 互操作测试 |
+| 泛化模式 | 含义 | 运行时示例覆盖范围 |
+|----------|------|--------------------|
+| `true` | 基于 Map 的泛化结果（默认模式） | 远程类型化结果检查 |
+| `gson` | JSON 格式的泛化结果 | 远程原始结果检查 |
+| `bean` | JavaBean 描述符格式的泛化结果 | 远程类型化结果检查 |
 | `protobuf-json` | Protobuf JSON 格式的泛化结果 | 当前 Hessian POJO 服务不使用该模式 |
 | `protobuf` | 为兼容旧版本保留的别名 | 保留兼容能力 |
 | `false` 或空值 | 关闭泛化调用 | 不发起泛化调用 |
 
-现有 Go 客户端会验证 `true`、`gson` 和 `bean` 的类型化结果，并确认未知模式会被拒绝。当前 `User` 服务是 Hessian POJO，并非 `proto.Message`，因此本集成流程不包含 `protobuf-json` 调用。
+运行现有 Go 客户端时，会检查 `true` 和 `bean` 的类型化结果、保留 `gson` 的原始结果，并确认未知模式会被拒绝。这些属于样例运行时检查，而不是通过 `go test` 执行的单元测试。当前 `User` 服务是 Hessian POJO，并非 `proto.Message`，因此本流程不包含 `protobuf-json` 调用。
 
 ## 启动 Java 服务端
 
