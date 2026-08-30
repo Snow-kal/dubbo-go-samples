@@ -267,9 +267,9 @@ func runGenericModeChecks(cli *client.Client) bool {
 			continue
 		}
 		if !testCase.typed {
-			result, err := service.Invoke(ctx, testCase.method, testCase.types, testCase.args)
-			if err != nil {
-				logger.Errorf("%s generic result (%s) failed: %v", testCase.method, testCase.name, err)
+			result, invokeErr := service.Invoke(ctx, testCase.method, testCase.types, testCase.args)
+			if invokeErr != nil {
+				logger.Errorf("%s generic result (%s) failed: %v", testCase.method, testCase.name, invokeErr)
 				failed = true
 				continue
 			}
