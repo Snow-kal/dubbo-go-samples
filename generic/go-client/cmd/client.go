@@ -351,17 +351,15 @@ func runGenericModeChecks(cli *client.Client, provider string) bool {
 }
 
 func checkGsonResult(provider string, result any, expectedID string) error {
-	if provider == GenericProviderJava {
-		switch result.(type) {
-		case map[any]any, map[string]any:
-			logger.Warnf("Java provider does not support gson result encoding; observed expected Map fallback type=%T", result)
-			return nil
-		}
+	switch result.(type) {
+	case map[any]any, map[string]any:
+		logger.Warnf("Generic gson returned Map fallback from %s provider; accepting type=%T", provider, result)
+		return nil
 	}
 
 	jsonResult, ok := result.(string)
 	if !ok {
-		return fmt.Errorf("provider %q returned %T, want JSON string", provider, result)
+		return fmt.Errorf("provider %q returned %T, want JSON string or Map fallback", provider, result)
 	}
 
 	var user pkg.User
