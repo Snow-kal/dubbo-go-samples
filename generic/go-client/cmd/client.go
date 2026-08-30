@@ -19,6 +19,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 )
@@ -39,10 +41,16 @@ import (
 )
 
 const (
-	DirectServerURL = "tri://127.0.0.1:50052"
-	UserProvider    = "org.apache.dubbo.samples.UserProvider"
-	ServiceVersion  = "1.0.0"
-	ServiceGroup    = "triple"
+	DirectServerURL        = "tri://127.0.0.1:50052"
+	UserProvider           = "org.apache.dubbo.samples.UserProvider"
+	ServiceVersion         = "1.0.0"
+	ServiceGroup           = "triple"
+	GenericProviderEnv     = "DUBBO_GO_GENERIC_PROVIDER"
+	GenericProviderGo      = "go"
+	GenericProviderJava    = "java"
+	DefaultGenericProvider = GenericProviderGo
+	ExpectedGetOneUserID   = "1000"
+	ExpectedGetUserByID    = "A003"
 )
 
 func main() {
@@ -78,9 +86,15 @@ func main() {
 	logger.Infof("Direct URL: %s", DirectServerURL)
 	logger.Info("Connected to server via direct URL, starting checks...")
 
+	provider := os.Getenv(GenericProviderEnv)
+	if provider == "" {
+		provider = DefaultGenericProvider
+	}
+	logger.Infof("Generic provider phase: %s", provider)
+
 	failed := false
 	failed = runGenericChecks(genericService.Invoke) || failed
-	failed = runGenericModeChecks(cli) || failed
+	failed = runGenericModeChecks(cli, provider) || failed
 
 	if failed {
 		logger.Errorf("Some generic call checks failed")
@@ -198,7 +212,7 @@ func runGenericChecks(invoke genericInvokeFunc) bool {
 	return failed
 }
 
-func runGenericModeChecks(cli *client.Client) bool {
+func runGenericModeChecks(cli *client.Client, provider string) bool {
 	failed := false
 	ctx := context.Background()
 
@@ -232,7 +246,7 @@ func runGenericModeChecks(cli *client.Client) bool {
 			types:      []string{"java.lang.String"},
 			args:       []hessian.Object{"A003"},
 			typed:      true,
-			expectedID: "A003",
+			expectedID: ExpectedGetUserByID,
 		},
 		{
 			name:   "gson",
@@ -248,7 +262,7 @@ func runGenericModeChecks(cli *client.Client) bool {
 			types:      []string{},
 			args:       []hessian.Object{},
 			typed:      true,
-			expectedID: "1000",
+			expectedID: ExpectedGetOneUserID,
 		},
 	}
 
@@ -273,12 +287,12 @@ func runGenericModeChecks(cli *client.Client) bool {
 				failed = true
 				continue
 			}
-			if result == nil {
-				logger.Errorf("%s generic result (%s) returned nil", testCase.method, testCase.name)
+			validationErr := checkGsonResult(provider, result, ExpectedGetOneUserID)
+			if validationErr != nil {
+				logger.Errorf("%s generic result (%s) failed validation: %v", testCase.method, testCase.name, validationErr)
 				failed = true
 				continue
 			}
-			logger.Infof("%s generic result (%s) type=%T res: %+v", testCase.method, testCase.name, result, result)
 			continue
 		}
 
@@ -304,4 +318,30 @@ func runGenericModeChecks(cli *client.Client) bool {
 	}
 
 	return failed
+}
+
+func checkGsonResult(provider string, result any, expectedID string) error {
+	if provider == GenericProviderJava {
+		switch result.(type) {
+		case map[any]any, map[string]any:
+			logger.Warnf("Java provider does not support gson result encoding; observed expected Map fallback type=%T", result)
+			return nil
+		}
+	}
+
+	jsonResult, ok := result.(string)
+	if !ok {
+		return fmt.Errorf("provider %q returned %T, want JSON string", provider, result)
+	}
+
+	var user pkg.User
+	if err := json.Unmarshal([]byte(jsonResult), &user); err != nil {
+		return fmt.Errorf("decode JSON result: %w", err)
+	}
+	if user.ID != expectedID || user.Name == "" || user.Age == 0 || user.Time.IsZero() {
+		return fmt.Errorf("incomplete JSON user: %+v", user)
+	}
+
+	logger.Infof("GetOneUser gson JSON result (%s provider) res: %+v", provider, user)
+	return nil
 }

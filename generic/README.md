@@ -40,13 +40,13 @@ The Go client uses `client.WithGenericType(...)` to select the generic format. T
 | Generic mode | Meaning | Runtime sample coverage |
 |--------------|---------|-------------------------|
 | `true` | Map-based generic result (default) | Remote typed-result check |
-| `gson` | JSON generic result | Remote raw-result check |
+| `gson` | JSON generic result | Go provider: strict JSON shape check; Java provider: explicit unsupported Map fallback check |
 | `bean` | JavaBean descriptor result | Remote typed-result check |
 | `protobuf-json` | Protobuf JSON result | Not used by the current Hessian POJO service |
 | `protobuf` | Legacy compatibility alias | Preserved for compatibility |
 | `false` or empty | Disable generic invocation | No generic call is made |
 
-When the existing Go client runs, it checks typed results for `true` and `bean`, keeps the raw result for `gson`, and confirms that an unknown mode is rejected. These are runtime sample checks rather than `go test` unit tests. The current `User` service is a Hessian POJO rather than a `proto.Message`, so `protobuf-json` is not included in this flow.
+When the existing Go client runs against the Go provider, the `gson` result must be a JSON string that decodes to a complete `User` (`ID`, `Name`, `Age`, and `Time`). The Java provider currently returns a Hessian Map fallback for this mode, so the Java phase identifies that result explicitly as unsupported instead of reporting it as a successful gson result. The client also checks typed results for `true` and `bean` and confirms that an unknown mode is rejected. These are runtime sample checks rather than `go test` unit tests. The current `User` service is a Hessian POJO rather than a `proto.Message`, so `protobuf-json` is not included in this flow.
 
 ## Run the Java Server
 
