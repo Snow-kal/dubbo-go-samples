@@ -39,14 +39,16 @@ Go 客户端使用 `client.WithGenericType(...)` 选择泛化格式。该配置�
 
 | 泛化模式 | 含义 | 运行时示例覆盖范围 |
 |----------|------|--------------------|
-| `true` | 基于 Map 的泛化结果（默认模式） | 远程类型化结果检查 |
+| `true` | 基于 Map 的泛化结果（默认模式） | 检查完整 `User`，包括 `Time` |
 | `gson` | JSON 格式的泛化结果 | Go provider：严格检查 JSON 结构；Java provider：明确检查不支持时的 Map fallback |
-| `bean` | JavaBean 描述符格式的泛化结果 | 远程类型化结果检查 |
+| `bean` | JavaBean 描述符格式的泛化结果 | 检查包含 `ID`、`Name` 和 `Age` 的类型化 DTO |
 | `protobuf-json` | Protobuf JSON 格式的泛化结果 | 当前 Hessian POJO 服务不使用该模式 |
 | `protobuf` | 为兼容旧版本保留的别名 | 保留兼容能力 |
 | `false` 或空值 | 关闭泛化调用 | 不发起泛化调用 |
 
-现有 Go 客户端连接 Go provider 时，要求 `gson` 结果必须是 JSON 字符串，并且能够解析为包含完整 `ID`、`Name`、`Age` 和 `Time` 的 `User`。Java provider 当前会为该模式返回 Hessian Map fallback，因此 Java 阶段会将其明确识别为“不支持”，不会将 Map fallback 记录为成功的 gson 结果。客户端还会检查 `true` 和 `bean` 的类型化结果，并确认未知模式会被拒绝。这些属于样例运行时检查，而不是通过 `go test` 执行的单元测试。当前 `User` 服务是 Hessian POJO，并非 `proto.Message`，因此本流程不包含 `protobuf-json` 调用。
+现有 Go 客户端连接 Go provider 时，要求 `gson` 结果必须是 JSON 字符串，并且能够解析为包含完整 `ID`、`Name`、`Age` 和 `Time` 的 `User`。Java provider 当前会为该模式返回 Hessian Map fallback，因此 Java 阶段会将其明确识别为“不支持”，不会将 Map fallback 记录为成功的 gson 结果。`true` 模式同样会检查 `User` 的全部可观察字段，包括 `Time`。
+
+Bean generalizer 可以表示导出的 Bean 属性，但无法对 Go `time.Time` 内部未导出的状态进行 round-trip。因此，`bean` 模式使用只包含受支持字段 `ID`、`Name` 和 `Age` 的明确 DTO，不再接受 `Time` 丢失但仍被视为完整的 `User`。客户端还会确认未知模式会被拒绝。这些属于样例运行时检查，而不是通过 `go test` 执行的单元测试。当前 `User` 服务是 Hessian POJO，并非 `proto.Message`，因此本流程不包含 `protobuf-json` 调用。
 
 ## 启动 Java 服务端
 

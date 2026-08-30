@@ -39,14 +39,16 @@ The Go client uses `client.WithGenericType(...)` to select the generic format. T
 
 | Generic mode | Meaning | Runtime sample coverage |
 |--------------|---------|-------------------------|
-| `true` | Map-based generic result (default) | Remote typed-result check |
+| `true` | Map-based generic result (default) | Complete `User` check, including `Time` |
 | `gson` | JSON generic result | Go provider: strict JSON shape check; Java provider: explicit unsupported Map fallback check |
-| `bean` | JavaBean descriptor result | Remote typed-result check |
+| `bean` | JavaBean descriptor result | Typed DTO check for `ID`, `Name`, and `Age` |
 | `protobuf-json` | Protobuf JSON result | Not used by the current Hessian POJO service |
 | `protobuf` | Legacy compatibility alias | Preserved for compatibility |
 | `false` or empty | Disable generic invocation | No generic call is made |
 
-When the existing Go client runs against the Go provider, the `gson` result must be a JSON string that decodes to a complete `User` (`ID`, `Name`, `Age`, and `Time`). The Java provider currently returns a Hessian Map fallback for this mode, so the Java phase identifies that result explicitly as unsupported instead of reporting it as a successful gson result. The client also checks typed results for `true` and `bean` and confirms that an unknown mode is rejected. These are runtime sample checks rather than `go test` unit tests. The current `User` service is a Hessian POJO rather than a `proto.Message`, so `protobuf-json` is not included in this flow.
+When the existing Go client runs against the Go provider, the `gson` result must be a JSON string that decodes to a complete `User` (`ID`, `Name`, `Age`, and `Time`). The Java provider currently returns a Hessian Map fallback for this mode, so the Java phase identifies that result explicitly as unsupported instead of reporting it as a successful gson result. The `true` mode also checks every observable `User` field, including `Time`.
+
+The Bean generalizer represents exported bean properties but cannot round-trip the unexported state inside Go's `time.Time`. The `bean` mode therefore uses an explicit DTO containing the supported `ID`, `Name`, and `Age` fields instead of accepting a partially populated `User`. The client also confirms that an unknown mode is rejected. These are runtime sample checks rather than `go test` unit tests. The current `User` service is a Hessian POJO rather than a `proto.Message`, so `protobuf-json` is not included in this flow.
 
 ## Run the Java Server
 

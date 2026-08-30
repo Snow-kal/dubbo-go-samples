@@ -105,6 +105,14 @@ func main() {
 
 type genericInvokeFunc func(context.Context, string, []string, []hessian.Object) (any, error)
 
+// beanUserDTO contains the fields that the Bean generalizer can round-trip reliably.
+// time.Time is excluded because its unexported state is not represented by a JavaBean descriptor.
+type beanUserDTO struct {
+	ID   string
+	Name string
+	Age  int32
+}
+
 func runGenericChecks(invoke genericInvokeFunc) bool {
 	failed := false
 	ctx := context.Background()
@@ -295,6 +303,28 @@ func runGenericModeChecks(cli *client.Client, provider string) bool {
 			}
 			continue
 		}
+		if testCase.mode == constant.GenericSerializationBean {
+			var user beanUserDTO
+			err = service.InvokeWithType(
+				ctx,
+				testCase.method,
+				testCase.types,
+				testCase.args,
+				&user,
+			)
+			if err != nil {
+				logger.Errorf("%s typed result (%s) failed: %v", testCase.method, testCase.name, err)
+				failed = true
+				continue
+			}
+			if user.ID != testCase.expectedID || user.Name == "" || user.Age == 0 {
+				logger.Errorf("%s typed result (%s) returned incomplete DTO: %+v", testCase.method, testCase.name, user)
+				failed = true
+				continue
+			}
+			logger.Infof("%s typed result (%s) DTO res: %+v", testCase.method, testCase.name, user)
+			continue
+		}
 
 		var user pkg.User
 		err = service.InvokeWithType(
@@ -309,7 +339,7 @@ func runGenericModeChecks(cli *client.Client, provider string) bool {
 			failed = true
 			continue
 		}
-		if user.ID != testCase.expectedID || user.Name == "" || user.Age == 0 {
+		if user.ID != testCase.expectedID || user.Name == "" || user.Age == 0 || user.Time.IsZero() {
 			logger.Errorf("%s typed result (%s) returned incomplete user: %+v", testCase.method, testCase.name, user)
 			failed = true
 			continue
